@@ -8,7 +8,6 @@ import time
 import gc
 import tensorflow as tf
 import random
-from process_dataset import *
 
 
 def cumulative_ablation(Model,
@@ -89,12 +88,7 @@ def cumulative_ablation(Model,
 def demo():
 
     # Initialize dataset.
-    ds_path = "path-to-your-image-parent-folder"
-    ds_path = "/home/workthu/zy/cal_results/imagenet_sample/"
-    wnid = random.sample(os.listdir(ds_path), 1)[0]
-    print("Choose wnid " + wnid + " ...")
-    ds_gen = load_directory(os.path.join(ds_path, wnid), sample_number=100, ImageNetLabel=True, VGGPretrainedProcess=True)
-    dataset = next(ds_gen)
+    dataset = "(4-D tensor, 2-D label)"
 
     # Initialize direcotry arguments
     current_time = time.strftime("%H-%M-%S")
