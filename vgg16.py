@@ -19,6 +19,17 @@ class VGG16(keras.models.Sequential):
     def build_intermediate_model(self, layer_name):
         self.intermediate_layer_model = keras.models.Model(inputs=self.input, outputs=self.get_layer(layer_name).output)
 
+    def build_predict_model(self, input_shape = None):
+        if input_shape is None: input_shape = (14, 14, 512)
+        inputs = tf.keras.layers.Input(input_shape)
+        x = self.get_layer("block5_pool")(inputs)
+        x = self.get_layer("flatten")(x)
+        x = self.get_layer("fc1")(x)
+        x = self.get_layer("fc2")(x)
+        x = self.get_layer("predictions")(x)
+
+        self.predict_model =  keras.models.Model(inputs, x, name="predict_model")
+
 
     def build(self, input_shape):
         self.add(Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1', input_shape=input_shape))
@@ -51,12 +62,12 @@ class VGG16(keras.models.Sequential):
         #Fully connected
         self.add(Flatten(name="flatten"))
         # self.add(Dropout(0.3))
-        self.add(Dense(4096, name='fc1'))
+        self.add(Dense(4096,activation= "relu",  name='fc1'))
         self.add(keras.layers.Activation("relu"))
 
         self.add(Dropout(0.5))
-        self.add(Dense(4096, name='fc2'))
-        self.add(keras.layers.Activation("relu"))
+        self.add(Dense(4096, activation= "relu", name='fc2'))
+        # self.add(keras.layers.Activation("relu"))
         self.add(Dropout(0.5))
 
         self.add(Dense(1000, activation="softmax", name='predictions'))
@@ -86,13 +97,12 @@ class VGG16(keras.models.Sequential):
             layer_outputs = self.output_layers(self.intermediate_layer_model, ds)
             return layer_outputs.numpy()
 
-
     @tf.function(experimental_relax_shapes=True)
     def output_layers(self, model, x):
         layer_outs = model(x)
         return layer_outs
 
-    def change_intermediate_weights(self, filterList = [], layer_name = "block4_conv3"):
+    def change_intermediate_weights(self, filterList = [], layer_name = "block5_conv3"):
         assert isinstance(filterList, list)
         # weights = np.array(self.get_weights())
         weights = self.get_layer(name = layer_name).get_weights()
@@ -107,6 +117,20 @@ class VGG16(keras.models.Sequential):
 
 
 if __name__ == "__main__":
-    pass
+    from process_dataset import *
+    from data_loader import ImageDataGenerator_Modify
 
-    
+    vggModel_path = "/home/workthu/zy/code/vgg_test/model/vgg_imagenet_train/vgg-dropout1-nol2/weights.18.hdf5"
+    # vggModel_path = "/home/workthu/.keras/models/vgg16_weights_tf_dim_ordering_tf_kernels.h5"
+    ds_path = "/home/workthu/zy/cal_results/imagenet_sample/"
+
+    vggModel = VGG16()
+    vggModel.load_weights(vggModel_path)
+    vggModel.compile()
+    ds = load_directory(ds_path, sample_number=100, 
+                ImageNetLabel=True, VGGPretrainedProcess=False)
+
+    vggModel.build_intermediate_model("block5_conv3")
+    outputs = vggModel.get_intermediate_layer_output(next(ds))
+    print(outputs.shape)
+    # vggModel.evaluate(ds, steps = 200)
