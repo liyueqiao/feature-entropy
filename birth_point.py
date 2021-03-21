@@ -5,6 +5,7 @@ import multiprocessing
 import psutil
 import itertools
 import tqdm
+import multiprocessing.pool
 
 
 def symmetrization(x, data_format):
@@ -87,16 +88,18 @@ def process_SingleImage_pool(packed_params):
 def run_multiprocess_calculation(inputArrList, fileNameList, workDirectory, baseDirectory, num_worker):
     
     with multiprocessing.Pool(processes=48) as p:
+    # p = multiprocessing.pool.ThreadPool()
         ans = p.map(process_SingleImage_pool, zip(inputArrList, fileNameList, itertools.repeat(workDirectory), itertools.repeat(baseDirectory)))
-        try:
-            result = list(ans)
-        except StopIteration:
-            print("stop")
-        except TimeoutError as error:
-            print("function took longer than %d seconds" % error.args[1])
-        except Exception as error:
-            print("function raised %s" % error)
-            raise error
+    try:
+        result = list(ans)
+    except StopIteration:
+        print("stop")
+    except TimeoutError as error:
+        print("function took longer than %d seconds" % error.args[1])
+    except Exception as error:
+        print("function raised %s" % error)
+        raise error
+    # p.close()
     p.join()
 
     if len(psutil.Process(os.getpid()).children(recursive=True)) == 0:
@@ -180,13 +183,15 @@ def calculate_birth_point(x,
 
     elif data_format == "channel_last": 
         bp_arr =  np.zeros(shape=(x_symmetric.shape[0], x_symmetric.shape[-1]))
-        for img_idx in tqdm.tqdm(range(x_symmetric.shape[0]), desc="Calculation: "):
+        # for img_idx in tqdm.tqdm(range(x_symmetric.shape[0]), desc="Calculation: "):
+        for img_idx in range(x_symmetric.shape[0]):
             featureMaps_perimage = x_symmetric[img_idx, :, :, :]
             channel_list = [featureMaps_perimage[:,:,channel_i] for channel_i in range(featureMaps_perimage.shape[-1])]
             tempFile_prefix = ["%d_%d"%(img_idx, channel_i) for channel_i in range(featureMaps_perimage.shape[-1])]
             if UseParallel:
                 workers_available = len(os.sched_getaffinity(0))
                 assert workers_available > 0
+                workers_available = 48
                 res = run_multiprocess_calculation(channel_list, tempFile_prefix, workDirectory, baseDirectory, num_worker=workers_available)
             else:
                 res = run_single_calculation(channel_list, tempFile_prefix, workDirectory, baseDirectory)
