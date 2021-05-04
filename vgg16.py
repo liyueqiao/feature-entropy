@@ -8,7 +8,6 @@ import tensorflow.keras as keras
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dropout, Dense
 
 
-
 class VGG16(keras.models.Sequential):
 
     def __init__(self,
