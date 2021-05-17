@@ -1,14 +1,14 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from vgg16 import VGG16
-from birth_point import *
-from feature_entropy import *
+from .vgg16 import VGG16
+from .birth_point import *
+from .feature_entropy import *
 import time
 import gc
 import tensorflow as tf
 import random
-from process_dataset import *
+from .process_dataset import *
 
 
 

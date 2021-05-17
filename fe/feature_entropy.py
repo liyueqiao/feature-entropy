@@ -44,6 +44,26 @@ def calculate_feature_entropy(birth_point_array):
     return (feature_entropy, selective_rate, ineffectiveness)
 
 
+def calculate_feature_entropy_for_array(bp_array):
+
+    """
+        Calculate the feature entropy for a given array.
+
+        Parameters
+        ----------
+        bp_array: 2-D array. [bp Distribution, channels]
+            The birth point array resulted from feature maps within the given layer.
+
+        Returns
+        -------
+        H: (feature_entropy, selective_rate, ineffectiveness).
+    """
+
+    bp_list = [bp_array[:, i] for i in range(bp_array.shape[1])]
+    H = np.asarray(list(map(calculate_feature_entropy, bp_list)))
+    return H
+
+
 def unit_importance_rank(bp_array):
 
     """

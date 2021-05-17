@@ -249,7 +249,7 @@ if __name__ == "__main__":
     a = a + a.T
     # a[0, 6] = 5
     # a[6, 0] = 5
-    ct = Clique_Topology(a, computeBetti0=True)
+    ct = BC(a, computeBetti0=True)
     ct.compute_betti_curves()
     # print(ct.__dict__)
     

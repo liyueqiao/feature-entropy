@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import numpy as np
 import pickle
@@ -7,25 +7,46 @@ import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dropout, Dense
 
+def mask_layer_outputs(unit_mask, layer_outputs):
+    unit_mask_tensor = tf.constant(unit_mask, dtype = "float32")
+    feature_map = layer_outputs * unit_mask_tensor
+    return feature_map
 
 class VGG16(keras.models.Sequential):
 
     def __init__(self,
-                input_shape = (224, 224, 3)):
+                input_shape = (224, 224, 3),
+                bn = False):
+        self.bn = bn
         super().__init__()
         self.build(input_shape)
 
     def build_intermediate_model(self, layer_name):
         self.intermediate_layer_model = keras.models.Model(inputs=self.input, outputs=self.get_layer(layer_name).output)
 
-    def build_predict_model(self, input_shape = None):
-        if input_shape is None: input_shape = (14, 14, 512)
+    def build_predict_model(self, layer_name = "block5_conv3"):
+        target_layer_index = -1
+        for i, l in enumerate(self.layers):
+            if l.name == layer_name:
+                target_layer_index = i
+                input_shape = l.output_shape[1:]
+        if target_layer_index == -1:
+            raise Exception("Layer name not found!")
+
         inputs = tf.keras.layers.Input(input_shape)
-        x = self.get_layer("block5_pool")(inputs)
-        x = self.get_layer("flatten")(x)
-        x = self.get_layer("fc1")(x)
-        x = self.get_layer("fc2")(x)
-        x = self.get_layer("predictions")(x)
+        x = self.layers[target_layer_index + 1](inputs)
+        for l in self.layers[target_layer_index + 2::]:
+            x = l(x)
+        
+        # x = self.get_layer("block5_pool")(inputs)
+        # x = self.get_layer("flatten")(x)
+        # x = self.get_layer("fc1")(x)
+        # if self.bn: x = self.get_layer("bn1")(x)
+        # x = self.get_layer("rl1")(x)
+        # x = self.get_layer("fc2")(x)
+        # if self.bn: x = self.get_layer("bn2")(x)
+        # x = self.get_layer("rl2")(x)
+        # x = self.get_layer("predictions")(x)
 
         self.predict_model =  keras.models.Model(inputs, x, name="predict_model")
 
@@ -59,15 +80,27 @@ class VGG16(keras.models.Sequential):
         self.add(MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool'))
 
         #Fully connected
+        # self.add(Flatten(name="flatten"))
+        # # self.add(Dropout(0.3))
+        # self.add(Dense(4096,activation= "relu",  name='fc1'))
+        # self.add(keras.layers.Activation("relu"))
+
+        # self.add(Dropout(0.5))
+        # self.add(Dense(4096, activation= "relu", name='fc2'))
+        # # self.add(keras.layers.Activation("relu"))
+        # self.add(Dropout(0.5))
+
         self.add(Flatten(name="flatten"))
         # self.add(Dropout(0.3))
-        self.add(Dense(4096,activation= "relu",  name='fc1'))
-        self.add(keras.layers.Activation("relu"))
+        self.add(Dense(4096, name='fc1'))
+        if self.bn: self.add(keras.layers.BatchNormalization(name = "bn1"))
+        self.add(keras.layers.Activation("relu", name = "rl1"))
 
-        self.add(Dropout(0.5))
-        self.add(Dense(4096, activation= "relu", name='fc2'))
-        # self.add(keras.layers.Activation("relu"))
-        self.add(Dropout(0.5))
+        # self.add(Dropout(0.5))
+        self.add(Dense(4096, name='fc2'))
+        if self.bn: self.add(keras.layers.BatchNormalization(name = "bn2"))
+        self.add(keras.layers.Activation("relu", name = "rl2"))
+        # self.add(Dropout(0.5))
 
         self.add(Dense(1000, activation="softmax", name='predictions'))
 
@@ -114,22 +147,34 @@ class VGG16(keras.models.Sequential):
     def compile(self):
         super().compile(loss="categorical_crossentropy", optimizer="sgd", metrics=["acc", keras.metrics.top_k_categorical_accuracy])
 
+    def init_model(self, fname, layer_name = "block5_conv3"):
+        self.compile()
+        self.build_intermediate_model(layer_name=layer_name)
+        self.load_weights(fname)
+        self.build_predict_model(layer_name = layer_name)
+        self.predict_model.compile(loss="categorical_crossentropy", optimizer="sgd", metrics=["acc", tf.keras.metrics.top_k_categorical_accuracy])
+
+
 
 if __name__ == "__main__":
-    from process_dataset import *
-    from data_loader import ImageDataGenerator_Modify
+    from .process_dataset import *
+    from .data_loader import ImageDataGenerator_Modify
 
-    vggModel_path = "/home/workthu/zy/code/vgg_test/model/vgg_imagenet_train/vgg-dropout1-nol2/weights.18.hdf5"
-    # vggModel_path = "/home/workthu/.keras/models/vgg16_weights_tf_dim_ordering_tf_kernels.h5"
-    ds_path = "/home/workthu/zy/cal_results/imagenet_sample/"
+    vggModel_path = "/media/workstation/zy/model/new_vgg_2_22/weights.01.hdf5"
+    # vggModel_path = "/home/workstation/.keras/models/vgg16_weights_tf_dim_ordering_tf_kernels.h5"
+    ds_path = "/media/workstation/zy/cal_results/imagenet_sample/"
+    wnid = sorted(os.listdir(ds_path))[1]
+    ds_path = os.path.join(ds_path, wnid)
 
     vggModel = VGG16()
     vggModel.load_weights(vggModel_path)
     vggModel.compile()
-    ds = load_directory(ds_path, sample_number=100, 
-                ImageNetLabel=True, VGGPretrainedProcess=False)
+    ds = load_directory(ds_path, sample_number=50, 
+                ImageNetLabel=True, VGGPretrainedProcess=True)
 
+    # vggModel.evaluate(ds, steps = 1)
     vggModel.build_intermediate_model("block5_conv3")
-    outputs = vggModel.get_intermediate_layer_output(next(ds))
-    print(outputs.shape)
-    # vggModel.evaluate(ds, steps = 200)
+    layer_output = vggModel.intermediate_layer_model.predict(ds, steps = 2)
+    
+    # with open("/home/workstation/zy/paper_image/nips/introduction/%s_fmaps_new_01.pkl"%(wnid), "wb") as p:
+    #     pickle.dump(layer_output, p)

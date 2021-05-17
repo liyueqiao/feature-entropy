@@ -1,4 +1,4 @@
-from compute_betti_curve import BC
+from .compute_betti_curve import BC
 import numpy as np
 import os
 import multiprocessing
@@ -119,7 +119,7 @@ def run_single_calculation(channel_list, tempFile_prefix, workDirectory, baseDir
 
 def calculate_birth_point(x,
                           workDirectory,
-                          baseDirectory,
+                          baseDirectory = os.path.dirname(os.path.realpath(__file__)),
                           data_format = "channel_last",
                           UseParallel = True,
                           ):
@@ -184,8 +184,8 @@ def calculate_birth_point(x,
 
     elif data_format == "channel_last": 
         bp_arr =  np.zeros(shape=(x_symmetric.shape[0], x_symmetric.shape[-1]))
-        # for img_idx in tqdm.tqdm(range(x_symmetric.shape[0]), desc="Calculation: "):
-        for img_idx in range(x_symmetric.shape[0]):
+        for img_idx in tqdm.tqdm(range(x_symmetric.shape[0]), desc="Calculation: "):
+        # for img_idx in range(x_symmetric.shape[0]):
             featureMaps_perimage = x_symmetric[img_idx, :, :, :]
             channel_list = [featureMaps_perimage[:,:,channel_i] for channel_i in range(featureMaps_perimage.shape[-1])]
             tempFile_prefix = ["%d_%d"%(img_idx, channel_i) for channel_i in range(featureMaps_perimage.shape[-1])]
